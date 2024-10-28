@@ -1,116 +1,251 @@
 # Solana Multisig Program
 
-This program implements a multisig wallet on the Solana blockchain, allowing multiple parties to collectively manage and approve transactions.
+A secure and feature-rich multisignature wallet program built on Solana using the Anchor framework.
 
-## Program ID
+## Overview
 
-The program is deployed on Solana devnet with the following address:
-
-```
-9tX4QfdBjXLUXiV1htgqcLedzygnm87zh58DWENv59f1
-```
-
-You can view the program details on the Solana Explorer:
-[https://explorer.solana.com/address/9tX4QfdBjXLUXiV1htgqcLedzygnm87zh58DWENv59f1?cluster=devnet](https://explorer.solana.com/address/9tX4QfdBjXLUXiV1htgqcLedzygnm87zh58DWENv59f1?cluster=devnet)
+This multisig program allows multiple owners to collectively manage and execute transactions with configurable thresholds, timelock periods, and security features.
 
 ## Features
 
-- Create multisig wallets with customizable owners and approval thresholds
-- Propose transactions
-- Approve transactions
-- Execute transactions once the approval threshold is met
+### Security Features
+- Configurable timelock period for transaction execution
+- Emergency pause mechanism
+- Owner authorization checks
+- Threshold enforcement
+- Transaction validation
+- Size limits enforcement
+- Duplicate approval prevention
 
-## Instructions
+### Transaction Management
+- Create transactions with descriptions
+- Approve/Revoke transaction approvals
+- Execute transactions with timelock
+- Cancel transactions
+- Transaction expiration mechanism
 
-The program includes the following main instructions:
+### Owner Management
+- Add/Remove owners
+- Update threshold
+- Maximum 20 owners per multisig
+- Duplicate owner prevention
 
-1. `create_multisig`: Initialize a new multisig wallet
-2. `create_transaction`: Propose a new transaction
-3. `approve_transaction`: Approve a pending transaction
-4. `execute_transaction`: Execute a transaction that has met the approval threshold
+## Account Structure
 
-## Account Structures
-
-### Multisig
-
+### Multisig Account
 ```rust
 pub struct Multisig {
     pub owners: Vec<Pubkey>,
     pub threshold: u64,
     pub transaction_count: u64,
+    pub timelock_period: i64,
+    pub is_paused: bool,
 }
 ```
 
-### Transaction
-
+### Transaction Account
 ```rust
 pub struct Transaction {
     pub creator: Pubkey,
     pub instruction: Vec<u8>,
+    pub description: String,
     pub approved_by: Vec<Pubkey>,
+    pub cancelled: bool,
     pub executed: bool,
+    pub created_at: i64,
+    pub expires_at: i64,
 }
 ```
 
-## Development and Deployment
+## Program Instructions
 
-This program is developed using the Anchor framework. To build and deploy:
+### Initialize Multisig
+```typescript
+program.methods
+    .initialize(
+        owners: PublicKey[], 
+        threshold: BN, 
+        timelockPeriod: BN
+    )
+    .accounts({
+        multisig: multisigPDA,
+        creator: wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+    })
+```
 
-1. Build the program:
-   ```bash
-   anchor build
-   ```
+### Create Transaction
+```typescript
+program.methods
+    .createTransaction(
+        programId: PublicKey,
+        instructionData: Buffer,
+        description: string
+    )
+    .accounts({
+        multisig: multisigPDA,
+        transaction: transactionPDA,
+        creator: wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+    })
+```
 
-2. Deploy to devnet:
-   ```bash
-   anchor deploy
-   ```
+### Approve Transaction
+```typescript
+program.methods
+    .approveTransaction()
+    .accounts({
+        multisig: multisigPDA,
+        transaction: transactionPDA,
+        signer: owner.publicKey,
+    })
+```
 
-3. Initialize the IDL:
-   ```bash
-   anchor idl init 9tX4QfdBjXLUXiV1htgqcLedzygnm87zh58DWENv59f1 -f target/idl/multisig_program.json
-   ```
+### Execute Transaction
+```typescript
+program.methods
+    .executeTransaction()
+    .accounts({
+        multisig: multisigPDA,
+        transaction: transactionPDA,
+        signer: executor.publicKey,
+    })
+```
 
-## Interacting with the Program
+### Update Owners
+```typescript
+program.methods
+    .updateOwners(newOwners: PublicKey[])
+    .accounts({
+        multisig: multisigPDA,
+        signer: wallet.publicKey,
+    })
+```
 
-You can interact with the program using the Anchor client libraries or by sending transactions directly through the Solana web3.js library.
+### Update Threshold
+```typescript
+program.methods
+    .updateThreshold(newThreshold: BN)
+    .accounts({
+        multisig: multisigPDA,
+        signer: wallet.publicKey,
+    })
+```
+
+## Constraints
+
+1. **Size Limits**
+   - Maximum 20 owners per multisig
+   - Maximum instruction size: 1024 bytes
+   - Maximum description length: 200 characters
+
+2. **Time Constraints**
+   - Minimum timelock period: 0 seconds
+   - Maximum timelock period: 30 days
+
+3. **Security Constraints**
+   - Only owners can approve transactions
+   - Must meet threshold for execution
+   - Cannot execute expired transactions
+   - Cannot execute during pause
+
+## Error Codes
+
+```rust
+pub enum ErrorCode {
+    NotEnoughApprovals,
+    TransactionAlreadyExecuted,
+    InvalidThreshold,
+    NoOwnersProvided,
+    EmptyInstruction,
+    NotAuthorized,
+    TransactionExpired,
+    TransactionCancelled,
+    InvalidTimelockPeriod,
+    TimelockNotExpired,
+    DescriptionTooLong,
+    InvalidInstruction,
+    DuplicateOwners,
+    InvalidOwnerCount,
+    MultisigPaused,
+}
+```
+
+## Events
+
+1. MultisigCreated
+2. TransactionCreated
+3. TransactionApproved
+4. ApprovalRevoked
+5. TransactionExecuted
+6. TransactionCancelled
+7. OwnersUpdated
+8. ThresholdUpdated
+9. PauseToggled
+
+## Getting Started
+
+### Prerequisites
+- Solana Tool Suite
+- Anchor Framework
+- Node.js and yarn
+- Rust
+
+### Installation
+```bash
+# Clone the repository
+git clone [repository-url]
+
+# Install dependencies
+yarn install
+
+# Build the program
+anchor build
+
+# Run tests
+anchor test
+
+# Deploy
+anchor deploy
+```
+
+### Test Suite
+```bash
+# Run all tests
+anchor test
+
+# Run specific test
+anchor test [test-name]
+```
 
 ## Security Considerations
 
-- Ensure that only authorized parties can create multisigs and transactions
-- Verify the threshold logic works correctly
-- Test edge cases, such as executing transactions without enough approvals
+1. **Threshold Configuration**
+   - Set appropriate threshold values
+   - Consider owner count when updating
 
-## Deployment Proof
+2. **Timelock Management**
+   - Set appropriate timelock periods
+   - Monitor transaction expiration
 
-The program has been successfully deployed to Solana devnet. You can verify the deployment using the Solana CLI:
+3. **Owner Management**
+   - Regularly verify owner list
+   - Plan owner updates carefully
 
-```bash
-solana program show 9tX4QfdBjXLUXiV1htgqcLedzygnm87zh58DWENv59f1 --url devnet
-```
+4. **Emergency Procedures**
+   - Test pause functionality
+   - Document recovery procedures
 
-Output:
-```
-Program Id: 9tX4QfdBjXLUXiV1htgqcLedzygnm87zh58DWENv59f1
-Owner: BPFLoaderUpgradeab1e11111111111111111111111
-ProgramData Address: 3eo2MGS2D3qQNxfboHAt6KspV2w7BqLK3TnJBRCj2cqM
-Authority: 57wMKYdCPiA8tn28t2ucZkxEz9Lvd9eMLDLXf5kJzR1h
-Last Deployed In Slot: 329923560
-Data Length: 235520 (0x39800) bytes
-Balance: 1.64042328 SOL
-```
+## Contributing
 
-The program's IDL has also been initialized:
-
-```bash
-anchor idl show 9tX4QfdBjXLUXiV1htgqcLedzygnm87zh58DWENv59f1
-```
-
-IDL Account: `EScpbwUxwTv5wkRQjHP4RvE3XRaXGiqpHkJ4LpA7pYJU`
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Create Pull Request
 
 ## License
 
+ISC
 
-
-## Contributing
 
